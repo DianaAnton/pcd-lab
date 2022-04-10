@@ -1,56 +1,26 @@
 /**
-Lab. 05 Tema 5
+Lab. 06 Tema 6
 Titlul temei:
-Crearea unui TokenRing unidirectional intre  N procese in lant conform imaginilor atasate
-P1->P2->P3->...etc...-Pn-1->Pn->P1
 
- Procesele realizeaza o comunicare tokenring prin intermediul unor buffer-e  de comunicatie anonime (pipes)
- Procesul P1 trimite prin pipe mesajul "Salut..." + PID proces catre P2.
-                     ex. de mesaj emis  catre P2"Salut...>1234  unde 1234" este PID proces
- Procesul P2 trimite prin pipe mesajul receptionat  de la P2 la care adauga  ">"+ PID proces catre P3
-                     ex. de mesaj emis  catre P3 "Salut...>1234>5678"  unde 5678 este PID proces
- Procesul P3 trimite prin pipe mesajul receptionat  
 
-de la P2 la care adauga   ">"+ PID proces   catre P4
- ......
- Procesul Pn trimite prin pipe mesal  
-
-de la Pn-1 la care adauga   ">"+ PID catre proces   P1  
-//  Procesul P1 afiseaza mesalul receptionat de la Pn 
-
-la care adauga   "___m-am intors" si  ringul este inchis (P1 se termina)
-                     ex. mesaj receptionat  de catre P1 "Salut...>1234>5678......>54321___m-am intors"
- Fiecare proces creat afișează
-   - identificatorul de proces  (Process ID) – PID
-   - identificatorul procesului părinte (parent process ID) – PPID.
-   - numarul procesului (1...N).
-   - mesajul receptionat de la procesul anterior.
-       Programul trebuie să conțină aşteptări asfel încât să nu apară procese orfan sau fenomene de deadlock.
-
-Numarul de procese  pentru exemplificare este N=5  si este citit de pe linia de comandă printr-o funcție din familia getopt___(). Se face testul de existenta si numericitate pentru N  si se afiseaza N.
-Procesele Pi se identifică prin PID și PPID (le afișează), afiseză I, care reprezintă al câtâlea proces creat este
-si transmit prin pipe mesajul catre  Pi+1 
-Procedura se repetă, P1-->P2, P2-->P3, P3-P4-->  P4-->P5, P5-->P1 care va afișa mesajul receptionat la care adaugă textul "__m-am intors", care atestă închiderea completă a ringului startat  în P1.
-Programul trebuie să conțină aşteptări asfel încât să nu apară procese orfan sau fenomene de deadlock.
-
-Data livrarii: 03.04.2022
+Data livrarii: 10.04.2022
 Student: Anton Diana-Ana-Maria
 An 3 IA
 ----------
 <
-Programul a fost rulat sub Windows Subsystem for Linux cu:
+Programul a fost rulat sub Kali Linux in VirtualBox cu:
     $gcc --version
-    gcc (Ubuntu 9.3.0-17ubuntu1~20.04) 9.3.0
-
-    $clang --version
-    clang version 10.0.0-4ubuntu1 
-    Target: x86_64-pc-linux-gnu
-    Thread model: posix
-    InstalledDir: /usr/bin
+    gcc (Debian 11.2.0-13) 11.2.0
 
     $lsb_release -a
-    Description:    Ubuntu 20.04.2 LTS
-    Release:        20.04
+    Distributor ID: Kali
+    Description:    Kali GNU/Linux Rolling
+    Release:        2021.4
+    Codename:       kali-rolling
+
+    Din cauza modului in care e montat WSL-ul in windows, nu am putut 
+folosi mkfifo si am rulat pe o distributie de Kali pe care o aveam setata
+in VirtualBox.
 >
 **/
 
@@ -129,10 +99,26 @@ int main(int argc, char **argv)
                     fprintf(stderr, "EROARE! Nu s-a putut redirecta STDOUT la fd_1\n");
                     exit(1);
                 }
-                close(fd_0); close(fd_1);
+                close(fd_0);
                 fprintf(stderr, "i = 0\n");
+                
+                char mess[MAX] = "";
+                char tp[100] = "";
+                pid_t pid = getpid(), ppid = getppid();
+                strcat(mess, "Salut...");
+                fprintf(stderr, "Mess %s\n", mess);
+                strcat(mess, "PID = ");                
+                fprintf(stderr, "Mess %s\n", mess);
+                char c_pid = pid;
+                strcat(mess, c_pid);
+                fprintf(stderr, "Mess %s\n", mess);
+                strcat(mess, " PPID = ");
+                fprintf(stderr, "Mess %s\n", mess);
+                strcat(mess, (char) ppid);
+                fprintf(stderr, "Mess %s\n", mess);
 
-                write(fd_1, "Salut...", strlen("Salut..."));
+                write(fd_1, mess, strlen(mess));
+                close(fd_1);
 
                 fprintf(stderr, "exit(0) child\n");
                 fprintf(stderr, "FOR i = %d\n", i);
@@ -150,13 +136,14 @@ int main(int argc, char **argv)
                     fprintf(stderr, "EROARE! Nu s-a putut redirecta STDIN la fd_0\n");
                     exit(1);
                 }
-                close(fd_0); close(fd_1);
                 // ultimul mesaj
                 fprintf(stderr, "i = n\n");
                 char mess[MAX];
                 read(fd_0, &mess, MAX);
                 strcat(mess, "___m-am intors\n");
                 write(fd_1, mess, strlen(mess));
+                close(fd_0); close(fd_1);
+                break;
             }
             else
             { // i > 0 && i < n
@@ -171,7 +158,6 @@ int main(int argc, char **argv)
                     fprintf(stderr, "EROARE! Nu s-a putut redirecta STDIN la fd_0\n");
                     exit(1);
                 }
-                close(fd_0); close(fd_1);
                 
                 char mess[MAX];
                 pid_t pid = getpid(), ppid = getppid();
@@ -181,7 +167,8 @@ int main(int argc, char **argv)
                 strcat(mess, "PPID = ");
                 strcat(mess, ppid);
                 strcat(mess, "\n");
-                write(fd_1, mess, strlen(mess));                
+                write(fd_1, mess, strlen(mess));
+                close(fd_0); close(fd_1);
                 
                 // write(fd[1], &pid, sizeof(pid_t));
                 fprintf(stderr, "exit(0) child\n");
@@ -192,11 +179,11 @@ int main(int argc, char **argv)
         {
             // parinte
             fprintf(stderr, "parinte\n");
-            for (int j = 0; j < n; j++)
-            {
-                wait(&status);
-            }
-            // while (waitpid(childpid, &status, NULL) != -1) {};
+            // for (int j = 0; j < n; j++)
+            // {
+            //     wait(&status);
+            // }
+            while (waitpid(childpid, &status, NULL) != -1) {};
             // if (i == 0)
             // {   
             //     // primul mesaj
@@ -207,7 +194,8 @@ int main(int argc, char **argv)
             // else if (i > 0 && i < n)
             // {
             //     strcat(message, " > ");
-            //     read(fd[0], &pid_msg, sizeof(int));                
+            read(fd_0, &message, MAX);
+            strcat(final_message, message);
             //     strcat(message, (char *) pid_msg);
             // }
         }
@@ -241,24 +229,27 @@ int main(int argc, char **argv)
     }
     close(fd_0); close(fd_1);            
     read(fd_0, &message, MAX);
-    fprintf(stderr, "Text:\n %s", message);
+    strcat(final_message, message);
+    fprintf(stderr, "Text:\n %s", final_message);
 
     return 0;
 }
 /*
 
-$gcc t05l05.c -o t05l05                         (compilare/link-editare program)
-$./t05l05 -n 3                                                  (rulare program)
+$gcc-11 t06l06.c -o t06l06                      (compilare/link-editare program)
+$./t06l06 -n 5                                                  (rulare program)
                                                               (afisare rezultat)
-    N = 3
-    Parintele: 8076
+                                  
+    N = 5
+    Parintele: 10205
     For i = 0
-    child 8076
+    child 10205
     i = 0
-    exit(0) child
-    child 8077
-    FOR i = 0
+    Mess Salut...
+    Mess Salut...PID = 
+    child 10206
     i = 0
-    exit(0) child
-    FOR i = 0
+    Mess Salut...
+    Mess Salut...PID = 
+    zsh: segmentation fault  ./t06l06 -n 5
 */
