@@ -62,10 +62,14 @@ Programul a fost rulat sub Windows Subsystem for Linux cu:
 #include <string.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#define MAX 9000
 
 int main(int argc, char **argv) 
 {
-    char message[8000], final_message[8000];
+    char message[MAX], final_message[MAX];
     int n, fd[2], status, childpid, option;
     pid_t parent_pid = getpid();
     pid_t pid_msg;
@@ -86,32 +90,25 @@ int main(int argc, char **argv)
     fprintf(stderr, "N = %d\n", n);
     fprintf(stderr, "Parintele: %d\n", parent_pid);
 
-    // deschid fd
-    // fprintf(stderr, "1\n");
-    if (pipe(fd) == -1) 
+    // rw-r--r--
+    mode_t fifo_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+    int fd_0, fd_1;
+
+    // creez fisier de pipe tip fifo
+    if (mkfifo("pipe_cu_nume", fifo_perms) == -1)
     {
-        fprintf(stderr, "EROARE! Nu s-a putut face pipe\n");
-        fprintf(stderr, "pipe\n");
+        fprintf(stderr, "EROARE! Nu pot crea pipe_cu_nume\n %d: %s", errno, strerror(errno));
         exit(1);
     }
-    // fprintf(stderr, "2\n");
-    // Redirect de stdin in fd[0]
-    if (dup2(fd[0], 0) == -1) 
-    {
-        fprintf(stderr, "EROARE! Nu s-a putut face dup2 pe stdin\n");
-        fprintf(stderr, "dup2\n");
-        exit(1);
-    }
-    // fprintf(stderr, "3\n");
-    // Redirect de stdout in fd[1]
-    if (dup2(fd[1], 1) == -1) 
-    {
-        fprintf(stderr, "EROARE! Nu s-a putut face dup2 pe stdout\n");
-        fprintf(stderr, "dup2\n");
-        exit(1);
-    }
-    // fprintf(stderr, "4\n");
-    // fprintf(stderr, "6\n");
+    // deschid fisier pt scriere
+    fd_0 = open("pipe_cu_nume", O_RDONLY | O_NONBLOCK);
+    // deschid fisier pt scriere
+    fd_1 = open("pipe_cu_nume", O_WRONLY);
+    // write something
+    //write(fd_1, "message", 30);
+    // - citeste date din fișier FIFO (pipe cu nume)
+    //read (fd_0, buffer, LMSG);
+
     for (int i = 0; i < n; i++)
     {
         fprintf(stderr, "For i = %d\n", i);
@@ -126,27 +123,67 @@ int main(int argc, char **argv)
             // copil
             fprintf(stderr, "child %d\n", getpid());
             if (i == 0)
-            {
-                // primul mesaj
+            { // primul mesa
+                if (dup2(fd_1, 1) == -1)
+                {
+                    fprintf(stderr, "EROARE! Nu s-a putut redirecta STDOUT la fd_1\n");
+                    exit(1);
+                }
+                close(fd_0); close(fd_1);
                 fprintf(stderr, "i = 0\n");
-                write(fd[1], "Salut...", strlen("Salut..."));
+
+                write(fd_1, "Salut...", strlen("Salut..."));
+
                 fprintf(stderr, "exit(0) child\n");
-                
                 fprintf(stderr, "FOR i = %d\n", i);
                 exit(0);
             }
             else if (i == (n - 1))
             {
+                if (dup2(fd_1, 1) == -1)
+                {
+                    fprintf(stderr, "EROARE! Nu s-a putut redirecta STDOUT la fd_1\n");
+                    exit(1);
+                }
+                if (dup2(fd_0, 0) == -1)
+                {
+                    fprintf(stderr, "EROARE! Nu s-a putut redirecta STDIN la fd_0\n");
+                    exit(1);
+                }
+                close(fd_0); close(fd_1);
                 // ultimul mesaj
                 fprintf(stderr, "i = n\n");
-                write(fd[1], "___m-am intors", strlen("___m-am intors"));
+                char mess[MAX];
+                read(fd_0, &mess, MAX);
+                strcat(mess, "___m-am intors\n");
+                write(fd_1, mess, strlen(mess));
             }
             else
-            {
-                // i > 0 && i < n
+            { // i > 0 && i < n
                 fprintf(stderr, "i e  0 - n\n");
-                pid_t pid = getpid();
-                write(fd[1], &pid, sizeof(pid_t));
+                if (dup2(fd_1, 1) == -1)
+                {
+                    fprintf(stderr, "EROARE! Nu s-a putut redirecta STDOUT la fd_1\n");
+                    exit(1);
+                }
+                if (dup2(fd_0, 0) == -1)
+                {
+                    fprintf(stderr, "EROARE! Nu s-a putut redirecta STDIN la fd_0\n");
+                    exit(1);
+                }
+                close(fd_0); close(fd_1);
+                
+                char mess[MAX];
+                pid_t pid = getpid(), ppid = getppid();
+                read(fd_0, &mess, MAX);
+                strcat(mess, "PID = ");
+                strcat(mess, pid);
+                strcat(mess, "PPID = ");
+                strcat(mess, ppid);
+                strcat(mess, "\n");
+                write(fd_1, mess, strlen(mess));                
+                
+                // write(fd[1], &pid, sizeof(pid_t));
                 fprintf(stderr, "exit(0) child\n");
                 exit(0);
             }
@@ -155,43 +192,56 @@ int main(int argc, char **argv)
         {
             // parinte
             fprintf(stderr, "parinte\n");
-            while (waitpid(childpid, &status, NULL) != -1) {};
-            if (i == 0)
-            {   
-                // primul mesaj
-                strcat(final_message, " > ");
-                read(fd[0], &message, strlen("Salut..."));                
-                strcat(final_message, message);
-            }
-            else if (i > 0 && i < n)
+            for (int j = 0; j < n; j++)
             {
-                strcat(message, " > ");
-                read(fd[0], &pid_msg, sizeof(int));                
-                strcat(message, (char *) pid_msg);
+                wait(&status);
             }
+            // while (waitpid(childpid, &status, NULL) != -1) {};
+            // if (i == 0)
+            // {   
+            //     // primul mesaj
+            //     strcat(final_message, " > ");
+            //     read(fd[0], &message, strlen("Salut..."));                
+            //     strcat(final_message, message);
+            // }
+            // else if (i > 0 && i < n)
+            // {
+            //     strcat(message, " > ");
+            //     read(fd[0], &pid_msg, sizeof(int));                
+            //     strcat(message, (char *) pid_msg);
+            // }
         }
         fprintf(stderr, "final de for\n");
-        fprintf(stderr, "%s\n", final_message);
+        // fprintf(stderr, "%s\n", final_message);
     }
     // inchid ambele fd
-    if (close(fd[0]) == -1) 
-    {
-        fprintf(stderr, "EROARE! Nu s-a putut inchide fd[0]\n");
-        exit(1);
-    }
-    if (close(fd[1]) == -1) 
-    {
-        fprintf(stderr, "EROARE! Nu s-a putut inchide fd[1]\n");
-        exit(1);
-    }
+    // if (close(fd[0]) == -1) 
+    // {
+    //     fprintf(stderr, "EROARE! Nu s-a putut inchide fd[0]\n");
+    //     exit(1);
+    // }
+    // if (close(fd[1]) == -1) 
+    // {
+    //     fprintf(stderr, "EROARE! Nu s-a putut inchide fd[1]\n");
+    //     exit(1);
+    // }
     // parinte ultimul mesaj
-    while (waitpid(childpid, &status, NULL) != -1) {};
-    strcat(final_message, message);
-    strcat(final_message, (char *) parent_pid);
-    strcat(final_message, " > ");
-    read(fd[0], &message, strlen("___m-am intors"));
-    strcat(final_message, message);
-    fprintf(stderr, "%s", final_message);
+    // while (waitpid(childpid, &status, NULL) != -1) {};
+    // strcat(final_message, message);
+    // strcat(final_message, (char *) parent_pid);
+    // strcat(final_message, " > ");
+    // read(fd[0], &message, strlen("___m-am intors"));
+    // strcat(final_message, message);
+    // fprintf(stderr, "%s", final_message);
+
+    if (dup2(fd_0, 0) == -1)
+    {
+        fprintf(stderr, "EROARE! Nu s-a putut redirecta STDIN la fd_0\n");
+        exit(1);
+    }
+    close(fd_0); close(fd_1);            
+    read(fd_0, &message, MAX);
+    fprintf(stderr, "Text:\n %s", message);
 
     return 0;
 }
