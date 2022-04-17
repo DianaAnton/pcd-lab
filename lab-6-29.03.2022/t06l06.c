@@ -1,7 +1,29 @@
 /**
 Lab. 06 Tema 6
 Titlul temei:
+Se va livra programul t06l06,c
+    1. Realizarea unui token-ring unidirecțional de N procese în lanț prin pipe-uri 
+cu nume. N este citit de pe linia de comandă printr-o funcție din familia getopt___(). 
+Procesul P1 se identifică prin PID și PPID (le afișează), afișează mesajul ”Salut”, pe 
+care îl transmite prin pipe cu nume procesului P2, P2 se identifică prin PID și PPID 
+(le afișează), recepționeză prin pipe cu nume mesajul de la P1, afișează mesajul
+ recepționat și îl transmite prin pipe procesului P3, Procedura se repetă, 
+ P3-->P4, P4-->P5, ...Pn-1-->Pn, Pn-->P1. P1 va afișa mesajul receptionat de la 
+ Pn la care adaugă textul "__m-am intors", care atestă închiderea completă 
+ a ringului în P1.
 
+    Testarea se va face pentru N=5 și se va crea următorul token-ring, 
+conectarea făcându-se prin pipe cu nume conform figurilor alăturate:
+
+Indicații de realizare:
+    Pentru crearea proceselor se va utiliza un ciclu de N iterații. Se va 
+utiliza redirectarea intrării / ieșirii standard către pipe-ul cu nume. 
+Toate afișările se vor face pe fișierul standard de eroare (stderr), prin apel 
+funcție fprintf(stderr,...). Programul trebuie să conțină aşteptări asfel 
+încât să nu apară procese orfan sau fenomene de deadlock. În principal se vor 
+utiliza apelurile: getopt()- pentru citirea lui N, fprintf(stderr,...), 
+mkfifo(), fork(), dup2(), open(), read(), write(), wait()/waitpid(), getpid() 
+și getppid() (posibil și alte funcții de I/O low-level, ex. prinf(), gets(), etc).
 
 Data livrarii: 10.04.2022
 Student: Anton Diana-Ana-Maria
@@ -67,7 +89,8 @@ int main(int argc, char **argv)
     // creez fisier de pipe tip fifo
     if (mkfifo("pipe_cu_nume", fifo_perms) == -1)
     {
-        fprintf(stderr, "EROARE! Nu pot crea pipe_cu_nume\n %d: %s", errno, strerror(errno));
+        fprintf(stderr, "EROARE! Nu pot crea pipe_cu_nume\n %d: %s", errno, 
+        strerror(errno));
         exit(1);
     }
     // deschid fisier pt scriere
